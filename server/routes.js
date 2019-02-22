@@ -1,59 +1,60 @@
-export default function (server) {
+/*
+ * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+ * or more contributor license agreements. Licensed under the Elastic License;
+ * you may not use this file except in compliance with the Elastic License.
+ */
 
-  // We can use this method, since we have set the require in the index.js to
-  // elasticsearch. So we can access the elasticsearch plugins safely here.
-  let call = server.plugins.elasticsearch.callWithRequest;
 
-  // Register a GET API at /api/elasticsearch_status/indices that returns
-  // an array of all indices in the elasticsearch. The server is actually an
-  // HAPI server and the complete documentation of the "route" method can be
-  // found in the official documentation: http://hapijs.com/api#serverrouteoptions
+
+export function initRoutes(server) {
+  const { taskManager } = server;
+
+  // server.route({
+  //   path: '/api/sample_tasks',
+  //   method: 'POST',
+  //   config: {
+  //     validate: {
+  //       payload: Joi.object({
+  //         taskType: Joi.string().required(),
+  //         interval: Joi.string().optional(),
+  //         params: Joi.object().required(),
+  //         state: Joi.object().optional(),
+  //         id: Joi.string().optional(),
+  //       }),
+  //     },
+  //   },
+  //   async handler(request) {
+  //     try {
+  //       const task = await taskManager.schedule(request.payload, { request });
+  //       return task;
+  //     } catch (err) {
+  //       return err;
+  //     }
+  //   },
+  // });
+
   server.route({
-    path: '/api/elasticsearch_status/indices',
+    path: '/api/sample_tasks',
     method: 'GET',
-    // The handler method will be called with the request that was made to this
-    // API and a reply method as 2nd parameter, that must be called with the
-    // content, that should be returned to the client.
-    handler(req, reply) {
-
-      // The call method that we just got from elasticsearch has the following
-      // syntax: the first parameter should be the request that actually came
-      // from the client. The callWithRequest method will take care about
-      // passing authentication data from kibana to elasticsearch or return
-      // authorization requests, etc.
-      // Second parameter to the function is the name of the javascript method
-      // you would like to call, as you can find it here in the documentation:
-      // https://www.elastic.co/guide/en/elasticsearch/client/javascript-api/current/
-      // The third parameter will be passed as a parameter to the javascript method
-      // (it should contain the data you would have also passed to the client directly).
-      // The method returns a promise, which will be resolved with the data returned
-      // from Elasticsearch.
-      call(req, 'cluster.state').then(function (response) {
-        // Return just the names of all indices to the client.
-        reply(
-          Object.keys(response.metadata.indices)
-        );
-      });
+    async handler() {
+      try {
+        return taskManager.fetch();
+      } catch (err) {
+        return err;
+      }
     }
   });
 
-  // Add a route to retrieve the status of an index by its name
   server.route({
-    // We can use path variables in here, that can be accessed on the request
-    // object in the handler.
-    path: '/api/elasticsearch_status/index/{name}',
-    method: 'GET',
-    handler(req, reply) {
-
-          reply("Hello World");
-
-   //   call(req, 'cluster.state', {
-   //     metric: 'metadata',
-   //     index: req.params.name
-     // }).then(function (response) {
-     //   reply(response.metadata.indices[req.params.name]);
-     // });
-    }
+    path: '/api/sample_tasks',
+    method: 'DELETE',
+    async handler() {
+      try {
+        const { docs: tasks } = await taskManager.fetch();
+        return Promise.all(tasks.map((task) => taskManager.remove(task.id)));
+      } catch (err) {
+        return err;
+      }
+    },
   });
-
-};
+}
